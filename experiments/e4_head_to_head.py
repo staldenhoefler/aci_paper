@@ -15,7 +15,7 @@ import torch
 import wandb
 
 from environment.tdtsp import TDTSPEnv
-from models.policy_net import PolicyNet
+from models.policy_net import AttentionPolicyNet
 from solvers.ga import run_ga
 from solvers.neuroevolution import run_neuroevolution, evaluate_greedy
 from utils.metrics import reference_tour, gap_to_reference
@@ -39,6 +39,9 @@ NE_GENS      = P["e4"]["ne_n_generations"]
 ELITE_FRAC   = P["neuroevolution"]["elite_frac"]
 TOURNAMENT_K = P["neuroevolution"]["tournament_k"]
 CROSSOVER    = P["neuroevolution"]["crossover"]
+NHEADS       = P["neuroevolution"]["n_heads"]
+NLAYERS      = P["neuroevolution"]["n_layers"]
+TRAIN_K      = P["neuroevolution"]["train_instances"]
 GA_GENS      = P["e4"]["ga_n_generations"]
 
 # ── Load best configs ─────────────────────────────────────────────────────────
@@ -98,7 +101,9 @@ print(f"  cost={ga_cost:.4f}   opt_time={ga_opt_time:.1f}s   inf_time={ga_inf_ti
 print(f"Running Neuroevolution (pop={NE_POP}, σ={NE_SIGMA}, gens={NE_GENS}, seed={best_seed})...")
 torch.manual_seed(best_seed)
 np.random.seed(best_seed)
-policy = PolicyNet(n_cities=N, hidden_dim=HIDDEN)
+policy = AttentionPolicyNet(n_cities=N, hidden_dim=HIDDEN,
+                            n_heads=NHEADS, n_layers=NLAYERS)
+train_envs = [TDTSPEnv(n_cities=N, seed=1000 + i) for i in range(TRAIN_K)]
 
 wandb.init(
     project=P["wandb"]["project"],
@@ -115,7 +120,7 @@ ne_res = run_neuroevolution(
     env, policy, pop_size=NE_POP, sigma=NE_SIGMA, n_generations=NE_GENS,
     elite_frac=ELITE_FRAC, tournament_k=TOURNAMENT_K, crossover=CROSSOVER,
     seed=best_seed, val_every=P["neuroevolution"]["val_every"], wandb_log=False,
-    gif_path=FIGURES / "e4_ne_tour.gif",
+    gif_path=FIGURES / "e4_ne_tour.gif", train_envs=train_envs,
 )
 ne_cost = ne_res["final_cost"]
 ne_opt_time = ne_res["runtime"]

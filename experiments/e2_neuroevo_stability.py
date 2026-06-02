@@ -14,7 +14,7 @@ import torch
 import wandb
 
 from environment.tdtsp import TDTSPEnv
-from models.policy_net import PolicyNet
+from models.policy_net import AttentionPolicyNet
 from solvers.neuroevolution import run_neuroevolution
 from utils.config import load_params, params_path, run_id
 
@@ -38,8 +38,12 @@ ELITE_FRAC   = P["neuroevolution"]["elite_frac"]
 TOURNAMENT_K = P["neuroevolution"]["tournament_k"]
 CROSSOVER    = P["neuroevolution"]["crossover"]
 HIDDEN       = P["neuroevolution"]["hidden_dim"]
+NHEADS       = P["neuroevolution"]["n_heads"]
+NLAYERS      = P["neuroevolution"]["n_layers"]
+TRAIN_K      = P["neuroevolution"]["train_instances"]
 
 env = TDTSPEnv(n_cities=N, seed=SEED)
+train_envs = [TDTSPEnv(n_cities=N, seed=1000 + i) for i in range(TRAIN_K)]
 
 print(f"=== E2: Neuroevolution Stability | n={N}, env-seed={SEED} ===\n")
 print(f"{'seed':>6} {'final_cost':>12} {'runtime':>10}")
@@ -61,7 +65,8 @@ summary_rows = []
 for seed in SEEDS:
     torch.manual_seed(seed)
     np.random.seed(seed)
-    policy = PolicyNet(n_cities=N, hidden_dim=HIDDEN)
+    policy = AttentionPolicyNet(n_cities=N, hidden_dim=HIDDEN,
+                                n_heads=NHEADS, n_layers=NLAYERS)
 
     gif_path = FIGURES / f"e2_neuroevo_seed{seed}.gif"
     result = run_neuroevolution(
@@ -76,6 +81,7 @@ for seed in SEEDS:
         val_every=NE_VAL_EVERY,
         wandb_log=False,
         gif_path=gif_path,
+        train_envs=train_envs,
     )
 
     print(f"{seed:>6} {result['final_cost']:>12.4f} {result['runtime']:>9.1f}s")

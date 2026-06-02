@@ -14,7 +14,7 @@ import torch
 import wandb
 
 from environment.tdtsp import TDTSPEnv
-from models.policy_net import PolicyNet
+from models.policy_net import AttentionPolicyNet
 from solvers.ga import run_ga
 from solvers.neuroevolution import run_neuroevolution
 from utils.metrics import reference_tour, gap_to_reference
@@ -39,6 +39,9 @@ ELITE_FRAC   = P["neuroevolution"]["elite_frac"]
 TOURNAMENT_K = P["neuroevolution"]["tournament_k"]
 CROSSOVER    = P["neuroevolution"]["crossover"]
 HIDDEN       = P["neuroevolution"]["hidden_dim"]
+NHEADS       = P["neuroevolution"]["n_heads"]
+NLAYERS      = P["neuroevolution"]["n_layers"]
+TRAIN_K      = P["neuroevolution"]["train_instances"]
 
 # ── Load best GA config from E1 ───────────────────────────────────────────────
 e1_csv = ROOT / "results" / RUN_ID / "e1_ga_sensitivity.csv"
@@ -83,12 +86,14 @@ for n in SIZES:
                     n_generations=GA_GENS, seed=SEED, wandb_log=False)
 
     torch.manual_seed(SEED)
-    policy = PolicyNet(n_cities=n, hidden_dim=HIDDEN)
+    policy = AttentionPolicyNet(n_cities=n, hidden_dim=HIDDEN,
+                                n_heads=NHEADS, n_layers=NLAYERS)
+    train_envs = [TDTSPEnv(n_cities=n, seed=1000 + i) for i in range(TRAIN_K)]
     ne_res = run_neuroevolution(env, policy, pop_size=NE_POP, sigma=NE_SIGMA,
                                 n_generations=NE_GENS, elite_frac=ELITE_FRAC,
                                 tournament_k=TOURNAMENT_K, crossover=CROSSOVER,
                                 seed=SEED, val_every=P["neuroevolution"]["val_every"],
-                                wandb_log=False)
+                                wandb_log=False, train_envs=train_envs)
 
     row = dict(
         n=n,

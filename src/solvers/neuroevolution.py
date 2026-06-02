@@ -62,19 +62,26 @@ def run_neuroevolution(
     n_generations=500,
     elite_frac=0.2,
     tournament_k=3,
-    crossover=True,
+    crossover=False,
     seed=0,
     val_every=10,
     wandb_log=True,
     gif_path=None,
+    train_envs=None,
 ):
     """
     Optimise *policy* weights with a genetic algorithm (Such et al. 2018).
-    No gradient computation — fitness is greedy tour cost.
+    No gradient computation — fitness is mean greedy tour cost.
+    Fitness is averaged over *train_envs* (a set of instances) so the policy
+    learns a generalising heuristic rather than memorising one tour; *env* is
+    the held-out instance used for the validation curve and final selection.
+    Mutation-only by default (Such et al.): weight-vector crossover suffers from
+    the competing-conventions problem.
     Modifies policy in-place; returns it with best weights loaded.
     """
     np.random.seed(seed)
     n_elite = max(1, int(pop_size * elite_frac))
+    fit_envs = train_envs if train_envs else [env]
 
     # Initialise population with diverse random perturbations around PyTorch init
     base = _get_weights(policy)
@@ -85,18 +92,19 @@ def run_neuroevolution(
     start = time.time()
 
     for gen in range(n_generations):
-        # ---- evaluate every individual ----
+        # ---- evaluate every individual (mean cost over training instances) ----
         fitness = np.empty(pop_size)
         for i, w in enumerate(pop):
             _set_weights(policy, w)
-            fitness[i] = -_evaluate(env, policy)   # maximise → minimise cost
-
-        best_cost = -fitness.max()
+            fitness[i] = -np.mean([_evaluate(e, policy) for e in fit_envs])
 
         if gen % val_every == 0:
-            history.append({"generation": gen, "best_cost": best_cost})
+            # validation curve: best individual on the held-out instance
+            _set_weights(policy, pop[fitness.argmax()])
+            val_cost = _evaluate(env, policy)
+            history.append({"generation": gen, "best_cost": val_cost})
             if wandb_log:
-                wandb.log({"best_cost": best_cost, "generation": gen})
+                wandb.log({"best_cost": val_cost, "generation": gen})
 
         # ---- next generation ----
         elite_idxs = fitness.argsort()[-n_elite:]

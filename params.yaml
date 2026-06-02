@@ -6,20 +6,23 @@ env:
 ga:
   pop_sizes:   [100, 200, 400]   # E1 grid search
   mutation_rates: [0.05, 0.1, 0.2]
-  n_generations: 5000            # E1 budget
+  n_generations: 3000            # E1 budget
   tournament_k: 3
 
 # ── Neuroevolution ────────────────────────────────────────────────────────────
 neuroevolution:
-  pop_size: 50
+  pop_size: 30             # grown (was 50) — Such et al. use large populations
   sigma: 0.05
-  n_generations: 500
+  n_generations: 120
   elite_frac: 0.2
   tournament_k: 3
-  crossover: true
+  crossover: false         # mutation-only (Such et al.): weight crossover is destructive
   val_every: 10
-  seeds: [1, 2, 3]         # E2 independent runs
-  hidden_dim: 128
+  seeds: [1, 2, 42]            # E2 independent runs
+  hidden_dim: 16           # attention dim; small net keeps the GA search space tractable
+  n_heads: 4
+  n_layers: 1
+  train_instances: 3       # fitness averaged over this many instances (generalisation)
 
 # ── Experiment-specific ───────────────────────────────────────────────────────
 e1:
@@ -31,12 +34,12 @@ e2:
 e3:
   sizes: [10, 20, 30, 50]
   ga_n_generations: 3000   # fixed budget for scaling experiment
-  ne_n_generations: 300
+  ne_n_generations: 80
 
 e4:
   n_cities: 30
-  ga_n_generations: 10000
-  ne_n_generations: 500
+  ga_n_generations: 3000
+  ne_n_generations: 120
 
 # ── Wandb ─────────────────────────────────────────────────────────────────────
 wandb:
